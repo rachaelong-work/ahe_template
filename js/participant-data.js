@@ -1,200 +1,97 @@
 
 /**
  * CSV ingestion and field mapping for Tableau extracts.
- *
- * CSV structure expected:
- * - Header row: Excel row 5 (or detected by header names)
- * - Data: row 6 onwards
- * - Columns A-D: ignored for field mapping
+ * Source layout: headers on Excel row 5; records from row 6 onward.
+ * Columns A-D are excluded from the mapping controls.
  */
-
-import { $, parseCSV, escapeHTML } from "./utils.js";
+import { $, parseCSV } from "./utils.js";
 
 export const FIELDS = [
-  { id: "agency", label: "Agency", type: "text" },
-  { id: "id", label: "Participant ID", type: "text" },
-  { id: "age", label: "Age group", type: "text" },
-  { id: "sex", label: "Sex", type: "text" },
-  { id: "designation", label: "Designation", type: "text" },
-
-  { id: "bmi", label: "BMI", type: "number" },
-  { id: "bmiCat", label: "BMI category", type: "text" },
-  { id: "fat", label: "Body fat % (PBF)", type: "number" },
-  { id: "fatCat", label: "PBF category", type: "text" },
-  { id: "smm", label: "Skeletal muscle mass (kg)", type: "number" },
-  { id: "smmCat", label: "SMM category", type: "text" },
-  { id: "vis", label: "Visceral fat level", type: "number" },
-
-  { id: "bpCategory", label: "Blood pressure category", type: "text" },
-  { id: "sbp", label: "Systolic BP (mmHg)", type: "number" },
-  { id: "dbp", label: "Diastolic BP (mmHg)", type: "number" },
-
-  { id: "bal", label: "Single-leg balance (sec)", type: "number" },
-  { id: "shoulder", label: "Shoulder mobility (cm)", type: "number" },
-  { id: "grip", label: "Hand grip (kg)", type: "number" },
-  { id: "sitStand", label: "1-min sit-to-stand (reps)", type: "number" },
-  { id: "stepHR", label: "3-min step recovery HR (bpm)", type: "number" },
-  { id: "fitnessCat", label: "Fitness performance category", type: "text" },
-
-  { id: "aerobic", label: "Aerobic activity (min/week)", type: "number" },
-  { id: "aerobicCat", label: "Aerobic activity category", type: "text" },
-  { id: "strengthDays", label: "Strength training (days/week)", type: "number" },
-  { id: "strengthCat", label: "Strength training category", type: "text" },
-  { id: "healthyChoices", label: "Healthier choices (times/week)", type: "number" },
-  { id: "healthyCat", label: "Healthier choices category", type: "text" },
-  { id: "sedentary", label: "Sedentary hours/day", type: "number" },
-  { id: "sedentaryCat", label: "Sedentary category", type: "text" },
-
-  { id: "readiness", label: "Readiness stage", type: "text" },
-
-  { id: "perHealth", label: "Perception: health & well-being", type: "number" },
-  { id: "perActive", label: "Perception: sport to stay active", type: "number" },
-  { id: "perSocial", label: "Perception: social connectedness", type: "number" },
-  { id: "perProductivity", label: "Perception: productivity", type: "number" },
-  { id: "perLeadership", label: "Perception: leadership support", type: "number" }
+  { id: "agency", label: "Agency (CSV Agency field)", type: "text", aliases: ["agency", "agency name", "organisation", "organization", "department", "ministry"] },
+  { id: "id", label: "Participant ID", type: "text", aliases: ["response id", "participant id", "id", "staff id", "employee id", "unique id", "record id"] },
+  { id: "age", label: "Age group", type: "text", aliases: ["age group", "age band", "age category"] },
+  { id: "sex", label: "Sex", type: "text", aliases: ["sex", "gender"] },
+  { id: "designation", label: "Management status", type: "text", aliases: ["do you manage a team in your course of work?", "management status", "management", "designation"] },
+  { id: "bmi", label: "BMI (kg/m²)", type: "number", aliases: ["body mass index (kg/m^2)", "body mass index (kg/m²)", "body mass index", "bmi"] },
+  { id: "fat", label: "Body fat (PBF, %)", type: "number", aliases: ["percentage body fat (%)", "percentage body fat", "body fat %", "body fat percentage", "pbf"] },
+  { id: "smm", label: "Skeletal muscle mass (kg)", type: "number", aliases: ["skeletal muscle mass (kg)", "skeletal muscle mass", "smm"] },
+  { id: "smmCat", label: "SMM indicator", type: "text", aliases: ["smm indicator", "smm category", "skeletal muscle category"] },
+  { id: "bpCategory", label: "Blood pressure category", type: "text", aliases: ["blood pressure category", "bp category", "blood pressure classification"] },
+  { id: "sbp", label: "Systolic BP (mmHg)", type: "number", aliases: ["systolic blood pressure (mmhg)", "systolic blood pressure", "sbp"] },
+  { id: "dbp", label: "Diastolic BP (mmHg)", type: "number", aliases: ["diastolic blood pressure (mmhg)", "diastolic blood pressure", "dbp"] },
+  { id: "bal", label: "Single-leg balance (seconds)", type: "number", aliases: ["single leg balance (seconds)", "single leg balance", "single-leg balance", "balance"] },
+  { id: "shoulder", label: "Shoulder mobility average (cm)", type: "number", aliases: ["shoulder mobility", "shoulder mobility cm", "back scratch"] },
+  { id: "grip", label: "Handgrip strength (kg)", type: "number", aliases: ["handgrip strength (kg)", "handgrip strength", "hand grip", "grip strength"] },
+  { id: "sitStand", label: "Sit-to-Stand (reps)", type: "number", aliases: ["sit-to-stand (reps)", "sit to stand", "sit-to-stand", "sit stand reps"] },
+  { id: "stepHR", label: "3-Minute Step Test (bpm)", type: "number", aliases: ["3-minute step test (bpm)", "3-minute step test", "3 minute step test", "step recovery hr"] },
+  { id: "fitnessCat", label: "Fitness performance category", type: "text", aliases: ["fitness category", "fitness performance category"] },
+  { id: "aerobic", label: "Aerobic activity (min/week)", type: "number", aliases: ["during a typical week how many minutes of moderate to vigorous intensity aerobic physical activity do you do?", "aerobic activity", "aerobic minutes"] },
+  { id: "aerobicCat", label: "Aerobic activity category", type: "text", aliases: ["aerobic category", "physical activity category"] },
+  { id: "strengthDays", label: "Strength training (days/week)", type: "number", aliases: ["on average how many days per week do you engage in muscle strengthening activities at moderate to vigorous intensity?", "strength training days", "strength days"] },
+  { id: "strengthCat", label: "Strength training category", type: "text", aliases: ["strength training category", "strength category"] },
+  { id: "healthyChoices", label: "Healthier choices (times/week)", type: "number", aliases: ["during a typical week how often do you try to choose healthier meal and beverage options?", "healthier choices", "healthy food choices"] },
+  { id: "healthyCat", label: "Healthier choices category", type: "text", aliases: ["healthier choices category", "healthy meal category"] },
+  { id: "sedentary", label: "Sedentary time (hours/day)", type: "number", aliases: ["on a typical day how much time do you usually spend sitting lying or reclining during waking hours hours minutes", "sedentary hours", "sitting hours"] },
+  { id: "sedentaryCat", label: "Sedentary category", type: "text", aliases: ["sedentary category", "sedentary behaviour category", "sedentary behavior category"] },
+  { id: "readiness", label: "Readiness to change", type: "text", aliases: ["how ready are you to make changes in your life to improve and or maintain your health and well being?", "readiness stage", "readiness to change"] },
+  { id: "perHealth", label: "Perception: health & well-being", type: "number", aliases: ["in general how would you rate your health and well being?", "health and well being", "health wellbeing score"] },
+  { id: "perActive", label: "Perception: sport to stay active", type: "number", aliases: ["how likely are you to choose sport as a way to stay active get fitter?", "sport to stay active"] },
+  { id: "perSocial", label: "Perception: social connectedness", type: "number", aliases: ["to what extent do you feel socially connected to your colleagues?", "social connectedness"] },
+  { id: "perProductivity", label: "Perception: productivity", type: "number", aliases: ["on a typical day how productive do you feel?", "productivity perception"] },
+  { id: "perLeadership", label: "Perception: leadership support", type: "number", aliases: ["to what extent do you feel supported by your leaders in your personal health and well being?", "leadership support"] }
 ];
 
-const norm = value =>
-  String(value ?? "")
-    .replace(/^\uFEFF/, "")
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+const norm = value => String(value ?? "")
+  .replace(/^\uFEFF/, "")
+  .toLowerCase()
+  .normalize("NFKD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^a-z0-9]+/g, " ")
+  .trim();
 
 let rawHeaders = [];
 let rawRows = [];
 let mapping = {};
 
-const HEADER_ALIASES = {
-  agency: [
-    "Agency",
-    "Ministry / Organ of State",
-    "Agency Ministry / Organ of State",
-    "Statutory Board"
-  ],
-
-  id: [
-    "Participant ID",
-    "Staff ID",
-    "Employee ID"
-  ],
-
-  age: [
-    "Age group",
-    "Age band"
-  ],
-
-  sex: [
-    "Sex",
-    "Gender"
-  ],
-
-  designation: [
-    "Designation",
-    "Do you manage a team in your course of work?"
-  ],
-
-  bmi: [
-    "Body Mass Index (kg/m^2)",
-    "Body Mass Index (kg/m²)",
-    "BMI"
-  ],
-
-  fat: [
-    "Percentage Body Fat (%)",
-    "Body fat %",
-    "Body fat percentage"
-  ],
-
-  smm: [
-    "Skeletal Muscle Mass (kg)"
-  ],
-
-  smmCat: [
-    "SMM Indicator"
-  ],
-
-  sbp: [
-    "Systolic Blood Pressure (mmHg)"
-  ],
-
-  dbp: [
-    "Diastolic Blood Pressure (mmHg)"
-  ],
-
-  sitStand: [
-    "Sit-to-Stand (reps)"
-  ],
-
-  grip: [
-    "Handgrip Strength (kg)"
-  ],
-
-  bal: [
-    "Single Leg Balance (seconds)"
-  ],
-
-  stepHR: [
-    "3-Minute Step Test (bpm)"
-  ],
-
-  aerobic: [
-    "During a typical week, how many minutes of moderate- to vigorous-intensity aerobic physical activity do you do?"
-  ],
-
-  strengthDays: [
-    "On average, how many days per week do you engage in muscle-strengthening activities at moderate to vigorous intensity?"
-  ],
-
-  healthyChoices: [
-    "During a typical week, how often do you try to choose healthier meal and beverage options?"
-  ],
-
-  sedentary: [
-    "On a typical day, how much time do you usually spend sitting, lying or reclining during waking hours? (Hours, Minutes)"
-  ],
-
-  readiness: [
-    "How ready are you to make changes in your life to improve and/or maintain your health and well-being?"
-  ],
-
-  perHealth: [
-    "In general, how would you rate your health and well-being?"
-  ],
-
-  perActive: [
-    "How likely are you to choose sport as a way to stay active/get fitter?"
-  ],
-
-  perProductivity: [
-    "On a typical day, how productive do you feel?"
-  ],
-
-  perSocial: [
-    "To what extent do you feel socially connected to your colleagues?"
-  ],
-
-  perLeadership: [
-    "To what extent do you feel supported by your leaders in your personal health and well-being?"
-  ]
+const HEADER_EXACT = {
+  agency: ["Agency"],
+  id: ["Response ID"],
+  sex: ["Sex"],
+  designation: ["Do you manage a team in your course of work?"],
+  bmi: ["Body Mass Index (kg/m^2)", "Body Mass Index (kg/m²)"],
+  fat: ["Percentage Body Fat (%)"],
+  smm: ["Skeletal Muscle Mass (kg)"],
+  smmCat: ["SMM Indicator"],
+  sbp: ["Systolic Blood Pressure (mmHg)"],
+  dbp: ["Diastolic Blood Pressure (mmHg)"],
+  sitStand: ["Sit-to-Stand (reps)"],
+  grip: ["Handgrip Strength (kg)"],
+  bal: ["Single Leg Balance (seconds)"],
+  stepHR: ["3-Minute Step Test (bpm)"],
+  aerobic: ["During a typical week, how many minutes of moderate- to vigorous-intensity aerobic physical activity do you do?"],
+  strengthDays: ["On average, how many days per week do you engage in muscle-strengthening activities at moderate to vigorous intensity?"],
+  healthyChoices: ["During a typical week, how often do you try to choose healthier meal and beverage options?"],
+  sedentary: ["On a typical day, how much time do you usually spend sitting, lying or reclining during waking hours? (Hours, Minutes)"],
+  readiness: ["How ready are you to make changes in your life to improve and/or maintain your health and well-being?"],
+  perHealth: ["In general, how would you rate your health and well-being?"],
+  perActive: ["How likely are you to choose sport as a way to stay active/get fitter?"],
+  perProductivity: ["On a typical day, how productive do you feel?"],
+  perSocial: ["To what extent do you feel socially connected to your colleagues?"],
+  perLeadership: ["To what extent do you feel supported by your leaders in your personal health and well-being?"]
 };
 
 function findHeader(headers, candidates) {
-  const normalizedHeaders = headers.map(norm);
-  const normalizedCandidates = candidates.map(norm);
+  const wanted = candidates.map(norm).filter(Boolean);
+  const normalized = headers.map(norm);
 
-  // Exact match first
-  let index = normalizedHeaders.findIndex(header =>
-    normalizedCandidates.includes(header)
+  let index = normalized.findIndex(header =>
+    wanted.includes(header)
   );
 
-  // Partial match second
   if (index < 0) {
-    index = normalizedHeaders.findIndex(header =>
-      normalizedCandidates.some(candidate =>
-        candidate.length > 12 && header.includes(candidate)
+    index = normalized.findIndex(header =>
+      wanted.some(candidate =>
+        candidate.length >= 14 && header.includes(candidate)
       )
     );
   }
@@ -203,102 +100,73 @@ function findHeader(headers, candidates) {
 }
 
 function guessMapping(headers) {
-  const m = {};
-
-  // Ignore Excel columns A-D in the mapping choices.
-  const usableHeaders = headers.slice(4);
+  // Columns A-D are excluded from mapping controls only.
+  // The original header array is retained so column indexes remain correct.
+  const available = headers.slice(4);
+  const result = {};
 
   FIELDS.forEach(field => {
     const candidates = [
+      ...(HEADER_EXACT[field.id] || []),
       field.label,
-      ...(HEADER_ALIASES[field.id] || [])
+      ...(field.aliases || [])
     ];
 
-    m[field.id] = findHeader(usableHeaders, candidates);
+    result[field.id] = findHeader(available, candidates);
   });
 
-  // Do not use a hard-coded Excel column number for Agency.
-  // Match the actual header names instead.
-  m.agency = findHeader(usableHeaders, [
-    "Agency"
-  ]);
+  // Use the exact Agency header. No hard-coded AH index is required.
+  result.agency = findHeader(available, ["Agency"]);
 
-  // Keep both shoulder measurements for averaging.
-  m._shoulderLeft = findHeader(usableHeaders, [
-    "Left Shoulder Mobility (cm)"
-  ]);
+  // Fallback agency hierarchy if the Agency cell is blank.
+  result._ministry = findHeader(available, ["Ministry / Organ of State"]);
+  result._statutory = findHeader(available, ["Statutory Board"]);
 
-  m._shoulderRight = findHeader(usableHeaders, [
-    "Right Shoulder Mobility (cm)"
-  ]);
+  // Additional source fields used to derive values.
+  result._birthYear = findHeader(available, ["Birth Year"]);
+  result._shoulderLeft = findHeader(available, ["Left Shoulder Mobility (cm)"]);
+  result._shoulderRight = findHeader(available, ["Right Shoulder Mobility (cm)"]);
 
-  // Agency hierarchy fallbacks
-  m._agencyMinistry = findHeader(usableHeaders, [
-    "Ministry / Organ of State",
-    "Agency Ministry / Organ of State"
-  ]);
-
-  m._agencyStatutory = findHeader(usableHeaders, [
-    "Statutory Board"
-  ]);
-
-  // Birth year is used to derive age group.
-  m._birthYear = findHeader(usableHeaders, [
-    "Birth Year"
-  ]);
-
-  return m;
+  return result;
 }
 
-/**
- * Find the header row from its contents.
- * This avoids assuming the first CSV row contains headers.
- */
-function findHeaderRow(rows) {
-  const required = [
-    "response id",
-    "agency",
-    "body mass index kg m 2",
-    "birth year"
-  ];
-
-  for (let i = 0; i < Math.min(rows.length, 20); i++) {
-    const values = rows[i].map(norm);
-
-    const hasAgency = values.includes("agency");
-    const hasBMI = values.some(value =>
-      value.includes("body mass index")
-    );
-    const hasSex = values.includes("sex");
-
-    if (hasAgency && hasBMI && hasSex) {
-      return i;
-    }
-  }
-
-  // Your supplied CSV has headers on Excel row 5.
-  return 4;
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[char]));
 }
 
 export function renderMapping(headers, initial = {}) {
   rawHeaders = headers;
-
   mapping = {
     ...guessMapping(headers),
     ...initial
   };
 
   const root = $("columnMapping");
+  const mappingHeaders = headers.slice(4);
 
-  root.innerHTML = FIELDS.map(field => {
-    const choices = headers.slice(4);
+  root.innerHTML = `
+    <div class="mapping-intro">
+      <strong>Review source fields</strong>
+      <p>
+        Columns A–D are excluded. Agency is matched to the CSV header
+        named “Agency”. Management status is derived from the team
+        management question. Shoulder mobility is calculated from
+        the left and right measurements.
+      </p>
+    </div>
 
-    return `
+    ${FIELDS.map(field => `
       <label class="mapping-label">
-        ${escapeHTML(field.label)}
+        <span>${escapeHTML(field.label)}</span>
         <select data-map="${field.id}">
-          <option value="">— Not present —</option>
-          ${choices.map(header => `
+          <option value="">— Not mapped —</option>
+          ${mappingHeaders.map(header => `
             <option
               value="${escapeHTML(header)}"
               ${mapping[field.id] === header ? "selected" : ""}
@@ -308,12 +176,12 @@ export function renderMapping(headers, initial = {}) {
           `).join("")}
         </select>
       </label>
-    `;
-  }).join("");
+    `).join("")}
+  `;
 
   root.hidden = false;
 
-  root.querySelectorAll("select").forEach(select => {
+  root.querySelectorAll("select[data-map]").forEach(select => {
     select.addEventListener("change", () => {
       mapping[select.dataset.map] = select.value;
     });
@@ -325,19 +193,17 @@ function parseNumeric(value) {
     return null;
   }
 
-  const cleaned = String(value)
+  const match = String(value)
     .replace(/,/g, "")
     .replace(/%/g, "")
-    .trim();
-
-  const match = cleaned.match(/-?\d+(?:\.\d+)?/);
+    .trim()
+    .match(/-?\d+(?:\.\d+)?/);
 
   if (!match) {
     return null;
   }
 
   const number = Number(match[0]);
-
   return Number.isFinite(number) ? number : null;
 }
 
@@ -348,8 +214,7 @@ function parseSedentary(value) {
     return null;
   }
 
-  // Example: "8 hours 30 minutes"
-  const match = text.match(
+  let match = text.match(
     /(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\D*(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m)?/
   );
 
@@ -357,11 +222,10 @@ function parseSedentary(value) {
     return Number(match[1]) + Number(match[2]) / 60;
   }
 
-  // Example: "8, 30" or "8:30"
-  const pair = text.match(/^\s*(\d+)\s*[,;:]\s*(\d+)\s*$/);
+  match = text.match(/^\s*(\d+)\s*[,;:]\s*(\d+)\s*$/);
 
-  if (pair) {
-    return Number(pair[1]) + Number(pair[2]) / 60;
+  if (match) {
+    return Number(match[1]) + Number(match[2]) / 60;
   }
 
   return parseNumeric(text);
@@ -374,25 +238,40 @@ function getValue(row, header) {
 
   const index = rawHeaders.indexOf(header);
 
-  if (index < 0) {
+  return index >= 0 ? (row[index] ?? null) : null;
+}
+
+function managementLabel(value) {
+  const answer = norm(value);
+
+  if (["yes", "y", "true", "1"].includes(answer)) {
+    return "Management";
+  }
+
+  if (["no", "n", "false", "0"].includes(answer)) {
+    return "Non-management";
+  }
+
+  if (!answer) {
     return null;
   }
 
-  return row[index] ?? null;
+  return String(value).trim();
 }
 
 function convertRows() {
-  return rawRows.map((row, rowIndex) => {
+  return rawRows.map(row => {
     const output = {};
 
     FIELDS.forEach(field => {
-      const header = mapping[field.id];
-      const value = getValue(row, header);
+      const value = getValue(row, mapping[field.id]);
 
       if (value == null || String(value).trim() === "") {
         output[field.id] = null;
+      } else if (field.id === "designation") {
+        output.designation = managementLabel(value);
       } else if (field.id === "sedentary") {
-        output[field.id] = parseSedentary(value);
+        output.sedentary = parseSedentary(value);
       } else if (field.type === "number") {
         output[field.id] = parseNumeric(value);
       } else {
@@ -400,18 +279,17 @@ function convertRows() {
       }
     });
 
-    // Use Ministry / Organ of State or Statutory Board
-    // if the main Agency field is empty.
+    // Use Ministry / Organ of State or Statutory Board only if
+    // the standalone Agency field is empty.
     if (!output.agency) {
-      const ministry = getValue(row, mapping._agencyMinistry);
-      const statutory = getValue(row, mapping._agencyStatutory);
-
       output.agency = String(
-        ministry || statutory || ""
+        getValue(row, mapping._ministry) ||
+        getValue(row, mapping._statutory) ||
+        ""
       ).trim() || null;
     }
 
-    // Derive shoulder mobility average.
+    // Shoulder mobility: average left and right measurements in cm.
     const left = parseNumeric(
       getValue(row, mapping._shoulderLeft)
     );
@@ -427,7 +305,7 @@ function convertRows() {
           : (left ?? right);
     }
 
-    // Derive age group from Birth Year.
+    // Derive age group from Birth Year if no age group is supplied.
     const birthYear = parseNumeric(
       getValue(row, mapping._birthYear)
     );
@@ -437,7 +315,10 @@ function convertRows() {
       birthYear > 1900 &&
       birthYear < 2100
     ) {
-      const age = new Date().getFullYear() - birthYear;
+      const age = Math.max(
+        0,
+        new Date().getFullYear() - birthYear
+      );
 
       output.age =
         age < 30 ? "Under 30" :
@@ -447,15 +328,33 @@ function convertRows() {
         "60+";
     }
 
-    // Do not import empty CSV rows.
-    const hasData = row.some(value =>
+    return output;
+  }).filter((output, index) =>
+    rawRows[index].some(value =>
       String(value ?? "").trim() !== ""
+    )
+  );
+}
+
+function findHeaderRow(rows) {
+  // Search the first several rows for the actual Tableau header.
+  for (let index = 0; index < Math.min(rows.length, 15); index++) {
+    const row = rows[index].map(norm);
+
+    const hasAgency = row.includes("agency");
+    const hasBMI = row.some(value =>
+      value.includes("body mass index")
     );
+    const hasSex = row.includes("sex");
+    const hasResponse = row.includes("response id");
 
-    output._sourceRow = rowIndex + 1;
+    if (hasAgency && hasBMI && hasSex && hasResponse) {
+      return index;
+    }
+  }
 
-    return hasData ? output : null;
-  }).filter(Boolean);
+  // User specified Excel row 5 as the header and row 6 onward as data.
+  return 4;
 }
 
 export function createParticipantRow(values = {}) {
@@ -483,6 +382,7 @@ export function createParticipantRow(values = {}) {
   button.type = "button";
   button.className = "light";
   button.textContent = "×";
+  button.setAttribute("aria-label", "Remove participant row");
   button.onclick = () => tr.remove();
 
   td.append(button);
@@ -492,27 +392,30 @@ export function createParticipantRow(values = {}) {
 }
 
 export function readParticipants() {
-  return [
-    ...$("inputTable").querySelectorAll("tbody tr")
-  ].map(tr => {
-    const record = {};
+  return [...$("inputTable").querySelectorAll("tbody tr")]
+    .map(row => {
+      const record = {};
 
-    tr.querySelectorAll("input").forEach(input => {
-      const value = input.value.trim();
+      row.querySelectorAll("input").forEach(input => {
+        const value = input.value.trim();
 
-      record[input.dataset.key] =
-        value === ""
-          ? null
-          : input.type === "number"
-            ? parseNumeric(value)
-            : value;
-    });
+        record[input.dataset.key] =
+          value === ""
+            ? null
+            : input.type === "number"
+              ? parseNumeric(value)
+              : value;
+      });
 
-    return record;
-  }).filter(record =>
-    record.agency ||
-    FIELDS.slice(5).some(field => record[field.id] != null)
-  );
+      return record;
+    })
+    .filter(record =>
+      record.id ||
+      record.agency ||
+      FIELDS.slice(5).some(field =>
+        record[field.id] != null
+      )
+    );
 }
 
 export function clearParticipants() {
@@ -521,15 +424,8 @@ export function clearParticipants() {
     .replaceChildren();
 }
 
-/**
- * Import CSV:
- * - Detect header row
- * - Use all rows after the header
- * - Keep original column indexes intact
- */
 export async function importCSV(file) {
-  const text = await file.text();
-  const rows = parseCSV(text);
+  const rows = parseCSV(await file.text());
 
   if (!rows.length) {
     throw new Error("The CSV file is empty.");
@@ -539,37 +435,24 @@ export async function importCSV(file) {
 
   if (headerIndex >= rows.length - 1) {
     throw new Error(
-      "Could not find the CSV header row or participant data."
+      "Could not find a header row followed by participant records."
     );
   }
 
-  rawHeaders = rows[headerIndex].map(header =>
-    String(header ?? "")
+  rawHeaders = rows[headerIndex].map(value =>
+    String(value ?? "")
       .replace(/^\uFEFF/, "")
       .trim()
   );
 
-  // Excel row 6 onwards, assuming headers are on row 5.
-  // If the header is detected elsewhere, use the rows after it.
-  rawRows = rows.slice(headerIndex + 1);
-
-  // Remove completely empty rows.
-  rawRows = rawRows.filter(row =>
-    row.some(value => String(value ?? "").trim() !== "")
-  );
-
-  if (!rawRows.length) {
-    throw new Error("No participant records were found after the header.");
-  }
+  // Header row Excel 5 -> data starts Excel row 6.
+  rawRows = rows
+    .slice(headerIndex + 1)
+    .filter(row =>
+      row.some(value => String(value ?? "").trim() !== "")
+    );
 
   renderMapping(rawHeaders);
-
-  console.log("CSV import details:", {
-    detectedHeaderRow: headerIndex + 1,
-    sourceRows: rawRows.length,
-    sourceColumns: rawHeaders.length,
-    headers: rawHeaders
-  });
 
   return {
     count: rawRows.length,
@@ -580,19 +463,6 @@ export async function importCSV(file) {
 export function applyCSVMapping() {
   const rows = convertRows();
 
-  console.log("Mapped participant rows:", rows.length);
-
-  console.table(
-    rows.slice(0, 5).map(row => ({
-      Agency: row.agency || "EMPTY",
-      BMI: row.bmi ?? "EMPTY",
-      BodyFat: row.fat ?? "EMPTY",
-      SystolicBP: row.sbp ?? "EMPTY",
-      Grip: row.grip ?? "EMPTY",
-      SitStand: row.sitStand ?? "EMPTY"
-    }))
-  );
-
   clearParticipants();
   rows.forEach(createParticipantRow);
 
@@ -600,21 +470,25 @@ export function applyCSVMapping() {
 }
 
 export function csvTemplate() {
-  return FIELDS.map(field =>
-    `"${field.label.replaceAll('"', '""')}"`
-  ).join(",") + "\n";
+  return FIELDS
+    .map(field =>
+      `"${field.label.replaceAll('"', '""')}"`
+    )
+    .join(",") + "\n";
 }
 
 export function loadSample() {
-  const samples = [
+  const sample = [
     {
       agency: "Agency A",
+      id: "S001",
       age: "30–39",
       sex: "Female",
-      designation: "Staff",
+      designation: "Management",
       bmi: 24.2,
       fat: 29.1,
       smm: 25.6,
+      smmCat: "As supplied",
       sbp: 118,
       dbp: 76,
       bal: 28,
@@ -634,13 +508,15 @@ export function loadSample() {
       perLeadership: 7.4
     },
     {
-      agency: "Agency B",
+      agency: "Agency A",
+      id: "S002",
       age: "40–49",
       sex: "Male",
-      designation: "Manager",
+      designation: "Non-management",
       bmi: 26.1,
       fat: 24.5,
       smm: 32.1,
+      smmCat: "As supplied",
       sbp: 132,
       dbp: 84,
       bal: 19,
@@ -658,9 +534,37 @@ export function loadSample() {
       perSocial: 6.9,
       perProductivity: 7.2,
       perLeadership: 7.1
+    },
+    {
+      agency: "Agency B",
+      id: "S003",
+      age: "30–39",
+      sex: "Female",
+      designation: "Non-management",
+      bmi: 22.5,
+      fat: 26.8,
+      smm: 27.9,
+      smmCat: "As supplied",
+      sbp: 115,
+      dbp: 70,
+      bal: 34,
+      shoulder: 4,
+      grip: 31,
+      sitStand: 38,
+      stepHR: 115,
+      aerobic: 45,
+      strengthDays: 0,
+      healthyChoices: 2,
+      sedentary: 10,
+      readiness: "Contemplation",
+      perHealth: 7.4,
+      perActive: 7.3,
+      perSocial: 7.2,
+      perProductivity: 7,
+      perLeadership: 7.6
     }
   ];
 
   clearParticipants();
-  samples.forEach(createParticipantRow);
+  sample.forEach(createParticipantRow);
 }
