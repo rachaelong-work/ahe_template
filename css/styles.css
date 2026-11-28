@@ -22,3 +22,118 @@ footer{border-top:1px solid var(--border);margin-top:28px;padding-top:13px;font-
 
 /* Chart + mapping enhancements */
 .chart-svg{display:block;width:100%;max-width:760px;height:auto;margin:8px auto}.donut-wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap}.donut-wrap svg{width:180px;flex:0 0 180px}.legend{font-size:12px;display:grid;gap:7px}.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:7px}.mapping{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:12px;background:#f4f8fb;border:1px solid var(--border);border-radius:9px;max-height:420px;overflow:auto}.mapping-label{margin:0;font-size:11px}.mapping-label select{padding:6px;font-size:12px}.report h4{font-size:15px;color:#176fa5;margin:18px 0 8px}.report h5{font-size:13px;color:#38566d;margin:14px 0 6px}.report .figure{break-inside:avoid}.report .chart-svg text{font-family:Arial,sans-serif}@media(max-width:650px){.mapping{grid-template-columns:1fr}.donut-wrap{justify-content:center}}
+
+
+/* =========================================
+   CSV FIELD MAPPING
+========================================= */
+
+#columnMapping {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 20px;
+    padding: 24px;
+    margin-top: 20px;
+    background: #f5f8fc;
+    border: 1px solid #d9e4ef;
+    border-radius: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Mapping instructions span the full width */
+
+#columnMapping .mapping-intro {
+    grid-column: 1 / -1;
+    padding: 16px 20px;
+    background: #e8f2fa;
+    border-left: 4px solid #287da5;
+    border-radius: 8px;
+}
+
+#columnMapping .mapping-intro strong {
+    display: block;
+    font-size: 1.05rem;
+    color: #174a70;
+    margin-bottom: 6px;
+}
+
+#columnMapping .mapping-intro p {
+    margin: 0;
+    color: #496477;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+/* Individual mapping fields */
+
+#columnMapping .mapping-label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+    color: #29465d;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* Dropdowns */
+
+#columnMapping .mapping-label select {
+    width: 100%;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid #cbd9e6;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #183b57;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+#columnMapping .mapping-label select:hover {
+    border-color: #6b9dbd;
+}
+
+#columnMapping .mapping-label select:focus {
+    outline: none;
+    border-color: #287da5;
+    box-shadow: 0 0 0 3px rgba(40, 125, 165, 0.15);
+}
+
+/* Tablet and smaller screens */
+
+@media (max-width: 768px) {
+    #columnMapping {
+        grid-template-columns: 1fr;
+        gap: 15px;
+        padding: 16px;
+    }
+
+    #columnMapping .mapping-intro {
+        padding: 14px 16px;
+    }
+
+    #columnMapping .mapping-label select {
+        font-size: 0.9rem;
+    }
+}
+
+/* Small mobile screens */
+
+@media (max-width: 480px) {
+    #columnMapping {
+        padding: 12px;
+        border-radius: 12px;
+    }
+
+    #columnMapping .mapping-label select {
+        padding: 11px 12px;
+    }
+}
