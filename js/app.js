@@ -1,4 +1,8 @@
-/** App orchestration: CSV import, agency filtering and export. */ 
+
+/**
+ * App orchestration:
+ * CSV import, agency filtering, report generation and export.
+ */
 
 import {
   $,
@@ -38,7 +42,7 @@ function agencies(records) {
 function refreshAgencyPicker() {
   const records = readParticipants();
   const select = $("agencySelect");
-  const oldValue = select.value;
+  const previous = select.value;
   const names = agencies(records);
 
   select.replaceChildren(
@@ -55,9 +59,7 @@ function refreshAgencyPicker() {
     );
   });
 
-  select.value = names.includes(oldValue)
-    ? oldValue
-    : ALL;
+  select.value = names.includes(previous) ? previous : ALL;
 
   $("datasetSummary").textContent =
     `${records.length} rows · ${names.length} agencies`;
@@ -65,9 +67,7 @@ function refreshAgencyPicker() {
   return names;
 }
 
-function selectedRecords(
-  name = $("agencySelect").value
-) {
+function selectedRecords(name = $("agencySelect").value) {
   const records = readParticipants();
 
   return name === ALL
@@ -77,10 +77,9 @@ function selectedRecords(
 
 function metadata(name) {
   return {
-    company:
-      name === ALL
-        ? ($("company").value.trim() || "All agencies")
-        : name,
+    company: name === ALL
+      ? ($("company").value.trim() || "All agencies")
+      : name,
 
     programme: $("programme").value.trim(),
     date: $("date").value,
@@ -116,8 +115,7 @@ function build(name = $("agencySelect").value) {
 
 function generate() {
   refreshAgencyPicker();
-
-  return !!build();
+  return Boolean(build());
 }
 
 function allReports() {
@@ -125,9 +123,14 @@ function allReports() {
 
   return names.map(name => {
     build(name);
-
     return $("report").cloneNode(true);
   });
+}
+
+function safeFile(value) {
+  return String(value || "Agency")
+    .replace(/[^a-z0-9_-]+/gi, "_")
+    .replace(/^_|_$/g, "");
 }
 
 function downloadHTML(nodes, filename) {
@@ -161,19 +164,14 @@ function downloadHTML(nodes, filename) {
   );
 }
 
-function safeFile(value) {
-  return String(value || "Agency")
-    .replace(/[^a-z0-9_-]+/gi, "_")
-    .replace(/^_|_$/g, "");
-}
-
 function setup() {
   const headers = $("inputHeaders");
 
   headers.innerHTML =
     FIELDS.map(field =>
       `<th>${escapeHTML(field.label)}</th>`
-    ).join("") + "<th>Remove</th>";
+    ).join("") +
+    "<th>Remove</th>";
 
   $("date").value = new Date()
     .toISOString()
@@ -181,235 +179,162 @@ function setup() {
 
   createParticipantRow();
 
-  // CSV file import
-  $("file").addEventListener(
-    "change",
-    async event => {
-      const file = event.target.files?.[0];
+  // Import CSV and display mapping.
+  // Do not populate the table until the user applies mapping.
+  $("file").addEventListener("change", async event => {
+    const file = event.target.files?.[0];
 
-      if (!file) return;
-
-      try {
-        const result = await importCSV(file);
-
-        const imported = applyCSVMapping();
-
-        refreshAgencyPicker();
-        generate();
-
-        $("datasetSummary").textContent =
-          `${result.count} source rows detected · ` +
-          `${imported} participant rows imported. ` +
-          `Review the field mapping and click Apply Mapping ` +
-          `if you change any columns.`;
-      } catch (error) {
-        alert(`CSV import failed: ${error.message}`);
-      }
-
-      event.target.value = "";
+    if (!file) {
+      return;
     }
-  );
 
-  // Apply field mapping
-$("applyMapping").addEventListener("click", () => {
-  try {
-    const count = applyCSVMapping();
+    try {
+      const result = await importCSV(file);
 
-    const participants = readParticipants();
+      $("datasetSummary").textContent =
+        `${result.count} source rows detected. ` +
+        `Review the field mapping, then click Apply field mapping / import rows.`;
 
-    refreshAgencyPicker();
-    generate();
+      console.log("CSV loaded. Review the mapping panel.");
+    } catch (error) {
+      alert(`CSV import failed: ${error.message}`);
+    }
 
-    // Check what was actually extracted from the CSV
-    console.log("Imported row count:", count);
-    console.log("First 5 extracted participants:");
+    event.target.value = "";
+  });
 
-    console.table(
-      participants.slice(0, 5).map(p => ({
-        Agency: p.agency,
-        Participant_ID: p.id,
-        Age: p.age,
-        Sex: p.sex,
-        BMI: p.bmi,
-        Body_Fat: p.fat,
-        Grip: p.grip,
-        Sit_Stand: p.sitStand
-      }))
-    );
+  // Apply mapping and import the rows.
+  $("applyMapping").addEventListener("click", () => {
+    try {
+      const count = applyCSVMapping();
 
-    // Check whether agency values were extracted
-    const agencyValues = participants
-      .map(p => p.agency)
-      .filter(v => v && String(v).trim() !== "");
-
-    console.log("Rows with agency values:", agencyValues.length);
-    console.log("Unique agency values:", [...new Set(agencyValues)]);
-
-    alert(
-      `${count} rows imported.\n\n` +
-      `Rows with agency values: ${agencyValues.length}\n\n` +
-      `Open the browser console (F12) to inspect the extracted data.`
-    );
-
-  } catch (e) {
-    alert(`Mapping could not be applied: ${e.message}`);
-  }
-});
-
-  // Sample data
-  $("sample").addEventListener(
-    "click",
-    () => {
-      loadSample();
       refreshAgencyPicker();
       generate();
-    }
-  );
 
-  // CSV template download
-  $("template").addEventListener(
-    "click",
-    () => {
-      downloadFile(
-        "AHE_Tableau_Field_Mapping_Template.csv",
-        csvTemplate(),
-        "text/csv;charset=utf-8"
+      alert(
+        `${count} rows imported.\n\n` +
+        `Please check the participant table and agency selection.`
+      );
+    } catch (error) {
+      alert(
+        `Mapping could not be applied: ${error.message}`
       );
     }
-  );
+  });
 
-  // Agency selection
-  $("agencySelect").addEventListener(
-    "change",
-    generate
-  );
+  $("sample").addEventListener("click", () => {
+    loadSample();
+    refreshAgencyPicker();
+    generate();
+  });
 
-  // Generate report
-  $("build").addEventListener(
-    "click",
-    generate
-  );
+  $("template").addEventListener("click", () => {
+    downloadFile(
+      "AHE_Tableau_Field_Mapping_Template.csv",
+      csvTemplate(),
+      "text/csv;charset=utf-8"
+    );
+  });
 
-  // Export selected agency to Word
-  $("word").addEventListener(
-    "click",
-    async () => {
-      if (!build()) return;
+  $("agencySelect").addEventListener("change", generate);
+  $("build").addEventListener("click", generate);
 
-      try {
-        const agencyName =
-          $("agencySelect").value === ALL
-            ? $("company").value || "All_Agencies"
-            : $("agencySelect").value;
-
-        await exportReportsToDocx(
-          [$("report")],
-          `${safeFile(agencyName)}_AHE_Report.docx`
-        );
-      } catch (error) {
-        alert(
-          `Word export failed: ${error.message}`
-        );
-      }
+  $("word").addEventListener("click", async () => {
+    if (!build()) {
+      return;
     }
-  );
 
-  // Export each agency as a separate Word document in a ZIP
-  $("wordAll").addEventListener(
-    "click",
-    async () => {
-      if (!readParticipants().length) {
-        return alert(
-          "Import or map the CSV first."
-        );
-      }
+    try {
+      const name = $("agencySelect").value === ALL
+        ? $("company").value || "All_Agencies"
+        : $("agencySelect").value;
 
-      if (!window.JSZip) {
-        return alert(
-          "ZIP library did not load. " +
-          "Check your internet connection and reload."
-        );
-      }
-
-      try {
-        const zip = new JSZip();
-        const names = agencies(readParticipants());
-
-        for (const name of names) {
-          const records = selectedRecords(name);
-
-          renderReport(records, metadata(name));
-
-          const node = $("report").cloneNode(true);
-
-          const blob = await createDocxBlob([node]);
-
-          zip.file(
-            `${safeFile(name)}_AHE_Report.docx`,
-            blob
-          );
-        }
-
-        const bundle = await zip.generateAsync({
-          type: "blob"
-        });
-
-        downloadFile(
-          "AHE_Separate_Agency_Word_Reports.zip",
-          bundle,
-          "application/zip"
-        );
-
-        generate();
-      } catch (error) {
-        alert(
-          `Separate agency Word export failed: ${error.message}`
-        );
-      }
+      await exportReportsToDocx(
+        [$("report")],
+        `${safeFile(name)}_AHE_Report.docx`
+      );
+    } catch (error) {
+      alert(`Word export failed: ${error.message}`);
     }
-  );
+  });
 
-  // PDF
-  $("pdf").addEventListener(
-    "click",
-    () => {
-      if (generate()) {
-        window.print();
-      }
+  $("wordAll").addEventListener("click", async () => {
+    if (!readParticipants().length) {
+      alert("Import or map the CSV first.");
+      return;
     }
-  );
 
-  // Export selected agency as HTML
-  $("html").addEventListener(
-    "click",
-    () => {
-      const node = build();
+    if (!window.JSZip) {
+      alert("ZIP library did not load. Check your internet connection.");
+      return;
+    }
 
-      if (node) {
-        downloadHTML(
-          [node],
-          "AHE_Agency_Report.html"
+    try {
+      const zip = new JSZip();
+      const names = agencies(readParticipants());
+
+      for (const name of names) {
+        const records = selectedRecords(name);
+
+        renderReport(records, metadata(name));
+
+        const node = $("report").cloneNode(true);
+        const blob = await createDocxBlob([node]);
+
+        zip.file(
+          `${safeFile(name)}_AHE_Report.docx`,
+          blob
         );
       }
-    }
-  );
 
-  // Export all agencies as HTML
-  $("htmlAll").addEventListener(
-    "click",
-    () => {
-      if (!readParticipants().length) {
-        return alert("Import the CSV first.");
-      }
+      const bundle = await zip.generateAsync({
+        type: "blob"
+      });
 
-      downloadHTML(
-        allReports(),
-        "AHE_All_Agency_Reports.html"
+      downloadFile(
+        "AHE_Separate_Agency_Word_Reports.zip",
+        bundle,
+        "application/zip"
       );
 
       generate();
+    } catch (error) {
+      alert(
+        `Separate agency Word export failed: ${error.message}`
+      );
     }
-  );
+  });
+
+  $("pdf").addEventListener("click", () => {
+    if (generate()) {
+      window.print();
+    }
+  });
+
+  $("html").addEventListener("click", () => {
+    const node = build();
+
+    if (node) {
+      downloadHTML(
+        [node],
+        "AHE_Agency_Report.html"
+      );
+    }
+  });
+
+  $("htmlAll").addEventListener("click", () => {
+    if (!readParticipants().length) {
+      alert("Import the CSV first.");
+      return;
+    }
+
+    downloadHTML(
+      allReports(),
+      "AHE_All_Agency_Reports.html"
+    );
+
+    generate();
+  });
 }
 
 setup();
