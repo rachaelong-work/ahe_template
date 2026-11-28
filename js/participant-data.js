@@ -519,22 +519,22 @@ export function createParticipantRow(values = {}) {
   $("inputTable").querySelector("tbody").append(tr);
 }
 
-export function readParticipants() {
+export function readParticipants() { 
   return [
     ...$("inputTable").querySelectorAll("tbody tr")
   ]
     .map(tr => {
       const r = {};
 
-      tr.querySelectorAll("input").forEach(i => {
-        const v = i.value.trim();
+      tr.querySelectorAll("input").forEach(input => {
+        const value = input.value.trim();
 
-        r[i.dataset.key] =
-          v === ""
+        r[input.dataset.key] =
+          value === ""
             ? null
-            : i.type === "number"
-              ? parseNumeric(v)
-              : v;
+            : input.type === "number"
+              ? parseNumeric(value)
+              : value;
       });
 
       return r;
@@ -545,6 +545,7 @@ export function readParticipants() {
       FIELDS.slice(5).some(f => r[f.id] != null)
     );
 }
+
 
 export function clearParticipants() {
   $("inputTable")
