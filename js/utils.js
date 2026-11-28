@@ -1,80 +1,98 @@
-/** Shared pure utilities: formatting, safe CSV parsing and file downloads. */ 
+
+/**
+ * Shared utilities:
+ * - DOM lookup
+ * - Number formatting
+ * - CSV parsing
+ * - File downloads
+ * - HTML escaping
+ */
 
 export const $ = (id) => document.getElementById(id);
 
-export const formatNumber = (value, digits = 1) =>
-  value == null || !Number.isFinite(Number(value))
-    ? "Not available"
-    : Number(value).toFixed(digits);
+export const formatNumber = (value, digits = 1) => {
+  if (value == null || !Number.isFinite(Number(value))) {
+    return "Not available";
+  }
 
+  return Number(value).toFixed(digits);
+};
+
+/**
+ * Parse CSV safely.
+ * Supports commas, semicolons and tabs, quoted values,
+ * escaped quotes, and line breaks inside quoted cells.
+ */
 export function parseCSV(text) {
-  // Tableau exports may use comma, semicolon, or tab delimiters depending on locale.
   text = String(text ?? "").replace(/^\uFEFF/, "");
 
-  const firstLine = text.split(/\r?\n/, 1)[0] || "";
+  const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+  const sample = lines.slice(0, 10).join("\n");
 
-  const countOutsideQuotes = delimiter => {
-    let n = 0;
-    let q = false;
+  function countDelimiter(delimiter) {
+    let count = 0;
+    let quoted = false;
 
-    for (let i = 0; i < firstLine.length; i++) {
-      if (firstLine[i] === '"') {
-        if (q && firstLine[i + 1] === '"') {
-          i++;
-        } else {
-          q = !q;
-        }
-      } else if (firstLine[i] === delimiter && !q) {
-        n++;
+    for (let i = 0; i < sample.length; i++) {
+      const char = sample[i];
+      const next = sample[i + 1];
+
+      if (char === '"' && quoted && next === '"') {
+        i++;
+      } else if (char === '"') {
+        quoted = !quoted;
+      } else if (char === delimiter && !quoted) {
+        count++;
       }
     }
 
-    return n;
-  };
+    return count;
+  }
 
-  const delimiters = [",", ";", "\t"].sort(
-    (a, b) => countOutsideQuotes(b) - countOutsideQuotes(a)
-  );
+  const delimiters = [",", ";", "\t"];
+  delimiters.sort((a, b) => countDelimiter(b) - countDelimiter(a));
 
   const delimiter = delimiters[0];
-  const rows = [];
 
+  const rows = [];
   let row = [];
   let cell = "";
   let quoted = false;
 
   for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
+    const char = text[i];
     const next = text[i + 1];
 
-    if (ch === '"' && quoted && next === '"') {
+    if (char === '"' && quoted && next === '"') {
       cell += '"';
       i++;
-    } else if (ch === '"') {
+    } else if (char === '"') {
       quoted = !quoted;
-    } else if (ch === delimiter && !quoted) {
+    } else if (char === delimiter && !quoted) {
       row.push(cell.trim());
       cell = "";
-    } else if ((ch === "\n" || ch === "\r") && !quoted) {
-      if (ch === "\r" && next === "\n") i++;
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") {
+        i++;
+      }
 
       row.push(cell.trim());
 
-      if (row.some(v => v !== "")) {
+      if (row.some(value => value !== "")) {
         rows.push(row);
       }
 
       row = [];
       cell = "";
     } else {
-      cell += ch;
+      cell += char;
     }
   }
 
-  if (cell !== "" || row.length) {
+  if (cell !== "" || row.length > 0) {
     row.push(cell.trim());
 
-    if (row.some(v => v !== "")) {
+    if (row.some(value => value !== "")) {
       rows.push(row);
     }
   }
@@ -83,9 +101,11 @@ export function parseCSV(text) {
 }
 
 export function downloadFile(filename, content, mimeType) {
-  const url = URL.createObjectURL(
-    new Blob([content], { type: mimeType })
-  );
+  const blob = new Blob([content], {
+    type: mimeType
+  });
+
+  const url = URL.createObjectURL(blob);
 
   const link = document.createElement("a");
   link.href = url;
@@ -99,11 +119,11 @@ export function downloadFile(filename, content, mimeType) {
 }
 
 export function escapeHTML(value = "") {
-  return String(value).replace(/[&<>"']/g, ch => ({
+  return String(value).replace(/[&<>"']/g, char => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     '"': "&quot;",
     "'": "&#39;"
-  }[ch]));
+  }[char]));
 }
