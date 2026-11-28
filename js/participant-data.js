@@ -591,7 +591,58 @@ export async function importCSV(file) {
 }
 
 export function applyCSVMapping() {
+  console.log("========== CSV MAPPING DIAGNOSTIC ==========");
+
+  console.log("CSV headers detected:", rawHeaders.length);
+  console.log("CSV data rows detected:", rawRows.length);
+
+  console.log("First source row column count:", rawRows[0]?.length);
+
+  console.log("Agency column AH (index 33):", {
+    header: rawHeaders[33],
+    firstRowHasValue: rawRows[0]?.[33] != null &&
+      String(rawRows[0][33]).trim() !== ""
+  });
+
+  console.log("Field mapping check:");
+
+  FIELDS.forEach(field => {
+    const header = mapping[field.id];
+    const index = rawHeaders.indexOf(header);
+
+    const populatedRows = index >= 0
+      ? rawRows.filter(row =>
+          row[index] != null &&
+          String(row[index]).trim() !== ""
+        ).length
+      : 0;
+
+    console.log(
+      field.label,
+      "| mapped header:",
+      header || "(not mapped)",
+      "| column index:",
+      index,
+      "| populated rows:",
+      populatedRows
+    );
+  });
+
   const rows = convertRows();
+
+  console.log("Converted rows:", rows.length);
+
+  console.log(
+    "First converted row (values hidden):",
+    Object.fromEntries(
+      Object.entries(rows[0] || {}).map(([key, value]) => [
+        key,
+        value == null || value === "" ? "EMPTY" : "PRESENT"
+      ])
+    )
+  );
+
+  console.log("===========================================");
 
   clearParticipants();
   rows.forEach(createParticipantRow);
