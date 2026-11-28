@@ -572,23 +572,49 @@ export function clearParticipants() {
     .replaceChildren();
 }
 
-export async function importCSV(file) {
-  const rows = parseCSV(await file.text());
 
-  if (rows.length < 2) {
-    throw Error("CSV has no participant rows.");
+
+export async function importCSV(file) {
+  const csvText = await file.text();
+  const rows = parseCSV(csvText);
+
+  // CSV row 5 (Excel row 5) contains the field headers.
+  // CSV row 6 onwards contains the actual records.
+  const HEADER_ROW_INDEX = 4;
+  const FIRST_DATA_ROW_INDEX = 5;
+
+  if (rows.length <= FIRST_DATA_ROW_INDEX) {
+    throw new Error("No participant data found from row 6 onwards.");
   }
 
-  rawHeaders = rows[0];
-  rawRows = rows.slice(1);
+  // Keep all columns in their original positions.
+  // Do not remove columns A-D from the raw data.
+  rawHeaders = rows[HEADER_ROW_INDEX].map(value =>
+    String(value ?? "").replace(/^\uFEFF/, "").trim()
+  );
 
+  rawRows = rows
+    .slice(FIRST_DATA_ROW_INDEX)
+    .filter(row =>
+      row.some(value => String(value ?? "").trim() !== "")
+    );
+
+  // Show mapping choices, but retain the original full column order.
   renderMapping(rawHeaders);
+
+  console.log("CSV import:", {
+    headers: rawHeaders.length,
+    dataRows: rawRows.length,
+    agencyHeaderAtAH: rawHeaders[33]
+  });
 
   return {
     count: rawRows.length,
     headers: rawHeaders
   };
 }
+
+
 
 export function applyCSVMapping() {
   console.log("========== CSV MAPPING DIAGNOSTIC ==========");
