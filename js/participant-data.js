@@ -7,11 +7,11 @@
 import { $, parseCSV } from "./utils.js";
 
 export const FIELDS = [
-  { id: "agency", label: "Agency (CSV Agency field)", type: "text", aliases: ["agency", "agency name", "organisation", "organization", "department", "ministry"] },
+  { id: "agency", label: "Agency", type: "text", aliases: ["agency", "agency name", "organisation", "organization", "department", "ministry"] },
   { id: "id", label: "Participant ID", type: "text", aliases: ["response id", "participant id", "id", "staff id", "employee id", "unique id", "record id"] },
   { id: "age", label: "Age group", type: "text", aliases: ["age group", "age band", "age category"] },
   { id: "sex", label: "Sex", type: "text", aliases: ["sex", "gender"] },
-  { id: "designation", label: "Management status", type: "text", aliases: ["do you manage a team in your course of work?", "management status", "management", "designation"] },
+  { id: "designation", label: "Designation (Management / Non-management)", type: "text", aliases: ["do you manage a team in your course of work?", "management status", "management", "designation"] },
   { id: "bmi", label: "BMI (kg/m²)", type: "number", aliases: ["body mass index (kg/m^2)", "body mass index (kg/m²)", "body mass index", "bmi"] },
   { id: "fat", label: "Body fat (PBF, %)", type: "number", aliases: ["percentage body fat (%)", "percentage body fat", "body fat %", "body fat percentage", "pbf"] },
   { id: "smm", label: "Skeletal muscle mass (kg)", type: "number", aliases: ["skeletal muscle mass (kg)", "skeletal muscle mass", "smm"] },
@@ -100,8 +100,6 @@ function findHeader(headers, candidates) {
 }
 
 function guessMapping(headers) {
-  // Columns A-D are excluded from mapping controls only.
-  // The original header array is retained so column indexes remain correct.
   const available = headers.slice(4);
   const result = {};
 
@@ -115,17 +113,17 @@ function guessMapping(headers) {
     result[field.id] = findHeader(available, candidates);
   });
 
-  // Use the exact Agency header. No hard-coded AH index is required.
-  result.agency = findHeader(available, ["Agency"]);
+  result.agency = findHeader(headers, ["Agency"]);
 
-  // Fallback agency hierarchy if the Agency cell is blank.
-  result._ministry = findHeader(available, ["Ministry / Organ of State"]);
-  result._statutory = findHeader(available, ["Statutory Board"]);
+  if (!result.agency && headers.length > 33) {
+    result.agency = headers[33];
+  }
 
-  // Additional source fields used to derive values.
-  result._birthYear = findHeader(available, ["Birth Year"]);
-  result._shoulderLeft = findHeader(available, ["Left Shoulder Mobility (cm)"]);
-  result._shoulderRight = findHeader(available, ["Right Shoulder Mobility (cm)"]);
+  result._ministry = findHeader(headers, ["Ministry / Organ of State"]);
+  result._statutory = findHeader(headers, ["Statutory Board"]);
+  result._birthYear = findHeader(headers, ["Birth Year"]);
+  result._shoulderLeft = findHeader(headers, ["Left Shoulder Mobility (cm)"]);
+  result._shoulderRight = findHeader(headers, ["Right Shoulder Mobility (cm)"]);
 
   return result;
 }
@@ -148,35 +146,103 @@ export function renderMapping(headers, initial = {}) {
   };
 
   const root = $("columnMapping");
-  const mappingHeaders = headers.slice(4);
+
+  const sourceForField = {
+    agency: ["Agency", "Ministry / Organ of State", "Statutory Board"],
+    id: ["Response ID"],
+    age: [],
+    sex: ["Sex"],
+    designation: ["Do you manage a team in your course of work?"],
+    bmi: ["Body Mass Index (kg/m^2)", "Body Mass Index (kg/m²)"],
+    fat: ["Percentage Body Fat (%)"],
+    smm: ["Skeletal Muscle Mass (kg)"],
+    smmCat: ["SMM Indicator"],
+    bpCategory: [],
+    sbp: ["Systolic Blood Pressure (mmHg)"],
+    dbp: ["Diastolic Blood Pressure (mmHg)"],
+    bal: ["Single Leg Balance (seconds)"],
+    shoulder: [],
+    grip: ["Handgrip Strength (kg)"],
+    sitStand: ["Sit-to-Stand (reps)"],
+    stepHR: ["3-Minute Step Test (bpm)"],
+    fitnessCat: [],
+    aerobic: ["During a typical week, how many minutes of moderate- to vigorous-intensity aerobic physical activity do you do?"],
+    aerobicCat: [],
+    strengthDays: ["On average, how many days per week do you engage in muscle-strengthening activities at moderate to vigorous intensity?"],
+    strengthCat: [],
+    healthyChoices: ["During a typical week, how often do you try to choose healthier meal and beverage options?"],
+    healthyCat: [],
+    sedentary: ["On a typical day, how much time do you usually spend sitting, lying or reclining during waking hours? (Hours, Minutes)"],
+    sedentaryCat: [],
+    readiness: ["How ready are you to make changes in your life to improve and/or maintain your health and well-being?"],
+    perHealth: ["In general, how would you rate your health and well-being?"],
+    perActive: ["How likely are you to choose sport as a way to stay active/get fitter?"],
+    perSocial: ["To what extent do you feel socially connected to your colleagues?"],
+    perProductivity: ["On a typical day, how productive do you feel?"],
+    perLeadership: ["To what extent do you feel supported by your leaders in your personal health and well-being?"]
+  };
+
+  const findAvailableHeader = candidate =>
+    headers.find(header => norm(header) === norm(candidate)) || "";
 
   root.innerHTML = `
     <div class="mapping-intro">
       <strong>Review source fields</strong>
       <p>
-        Columns A–D are excluded. Agency is matched to the CSV header
-        named “Agency”. Management status is derived from the team
-        management question. Shoulder mobility is calculated from
-        the left and right measurements.
+        The dropdowns show only the matching source field, not every CSV column.
+        Agency is read from the “Agency” header (Excel column AH if needed).
+        Management status is derived from the team-management question.
+        Shoulder mobility is calculated as the average of left and right values in cm.
+        Age group is derived from Birth Year when no age group column is supplied.
       </p>
     </div>
 
-    ${FIELDS.map(field => `
-      <label class="mapping-label">
-        <span>${escapeHTML(field.label)}</span>
-        <select data-map="${field.id}">
-          <option value="">— Not mapped —</option>
-          ${mappingHeaders.map(header => `
-            <option
-              value="${escapeHTML(header)}"
-              ${mapping[field.id] === header ? "selected" : ""}
-            >
-              ${escapeHTML(header)}
-            </option>
-          `).join("")}
-        </select>
-      </label>
-    `).join("")}
+    ${FIELDS.map(field => {
+      const candidates = sourceForField[field.id] || [];
+      const options = candidates
+        .map(findAvailableHeader)
+        .filter(Boolean);
+
+      let selected = mapping[field.id] || "";
+
+      if (options.length && !options.includes(selected)) {
+        selected = options[0];
+        mapping[field.id] = selected;
+      }
+
+      const calculated =
+        field.id === "shoulder" || field.id === "age";
+
+      const label = calculated
+        ? field.id === "shoulder"
+          ? "Calculated from left/right mobility columns"
+          : "Calculated from Birth Year"
+        : "";
+
+      return `
+        <label class="mapping-label">
+          <span>${escapeHTML(field.label)}</span>
+
+          <select
+            data-map="${field.id}"
+            ${calculated ? "disabled" : ""}
+          >
+            <option value="">— Not present —</option>
+
+            ${options.map(header => `
+              <option
+                value="${escapeHTML(header)}"
+                ${selected === header ? "selected" : ""}
+              >${escapeHTML(header)}</option>
+            `).join("")}
+          </select>
+
+          ${label
+            ? `<small class="mapping-note">${escapeHTML(label)}</small>`
+            : ""}
+        </label>
+      `;
+    }).join("")}
   `;
 
   root.hidden = false;
@@ -279,8 +345,6 @@ function convertRows() {
       }
     });
 
-    // Use Ministry / Organ of State or Statutory Board only if
-    // the standalone Agency field is empty.
     if (!output.agency) {
       output.agency = String(
         getValue(row, mapping._ministry) ||
@@ -289,7 +353,6 @@ function convertRows() {
       ).trim() || null;
     }
 
-    // Shoulder mobility: average left and right measurements in cm.
     const left = parseNumeric(
       getValue(row, mapping._shoulderLeft)
     );
@@ -305,7 +368,6 @@ function convertRows() {
           : (left ?? right);
     }
 
-    // Derive age group from Birth Year if no age group is supplied.
     const birthYear = parseNumeric(
       getValue(row, mapping._birthYear)
     );
@@ -337,7 +399,6 @@ function convertRows() {
 }
 
 function findHeaderRow(rows) {
-  // Search the first several rows for the actual Tableau header.
   for (let index = 0; index < Math.min(rows.length, 15); index++) {
     const row = rows[index].map(norm);
 
@@ -353,7 +414,6 @@ function findHeaderRow(rows) {
     }
   }
 
-  // User specified Excel row 5 as the header and row 6 onward as data.
   return 4;
 }
 
@@ -445,7 +505,6 @@ export async function importCSV(file) {
       .trim()
   );
 
-  // Header row Excel 5 -> data starts Excel row 6.
   rawRows = rows
     .slice(headerIndex + 1)
     .filter(row =>
