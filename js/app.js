@@ -211,26 +211,50 @@ function setup() {
   );
 
   // Apply field mapping
-  $("applyMapping").addEventListener(
-    "click",
-    () => {
-      try {
-        const count = applyCSVMapping();
+$("applyMapping").addEventListener("click", () => {
+  try {
+    const count = applyCSVMapping();
 
-        refreshAgencyPicker();
-        generate();
+    const participants = readParticipants();
 
-        alert(
-          `${count} rows mapped and imported. ` +
-          `Review the selected agency and report.`
-        );
-      } catch (error) {
-        alert(
-          `Mapping could not be applied: ${error.message}`
-        );
-      }
-    }
-  );
+    refreshAgencyPicker();
+    generate();
+
+    // Check what was actually extracted from the CSV
+    console.log("Imported row count:", count);
+    console.log("First 5 extracted participants:");
+
+    console.table(
+      participants.slice(0, 5).map(p => ({
+        Agency: p.agency,
+        Participant_ID: p.id,
+        Age: p.age,
+        Sex: p.sex,
+        BMI: p.bmi,
+        Body_Fat: p.fat,
+        Grip: p.grip,
+        Sit_Stand: p.sitStand
+      }))
+    );
+
+    // Check whether agency values were extracted
+    const agencyValues = participants
+      .map(p => p.agency)
+      .filter(v => v && String(v).trim() !== "");
+
+    console.log("Rows with agency values:", agencyValues.length);
+    console.log("Unique agency values:", [...new Set(agencyValues)]);
+
+    alert(
+      `${count} rows imported.\n\n` +
+      `Rows with agency values: ${agencyValues.length}\n\n` +
+      `Open the browser console (F12) to inspect the extracted data.`
+    );
+
+  } catch (e) {
+    alert(`Mapping could not be applied: ${e.message}`);
+  }
+});
 
   // Sample data
   $("sample").addEventListener(
