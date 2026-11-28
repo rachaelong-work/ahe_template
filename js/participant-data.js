@@ -281,6 +281,7 @@ let rawHeaders = [];
 let rawRows = [];
 let mapping = {};
 
+
 function guessMapping(headers) {
   const normalized = headers.map(h =>
     norm(String(h).replace(/^\uFEFF/, ""))
@@ -308,7 +309,24 @@ function guessMapping(headers) {
     m[f.id] = ix >= 0 ? headers[ix] : "";
   });
 
-  // Left and right shoulder mobility are combined into one mean.
+  /*
+   * AGENCY MAPPING
+   * Excel column AH = column 34
+   * JavaScript index = 33
+   *
+   * Force the agency field to use column AH,
+   * instead of accidentally matching the date column.
+   */
+  const AGENCY_COLUMN_INDEX = 33;
+
+  if (headers.length > AGENCY_COLUMN_INDEX) {
+    m.agency = headers[AGENCY_COLUMN_INDEX];
+  }
+
+  /*
+   * Keep the left and right shoulder mobility
+   * columns for calculating the average.
+   */
   m._shoulderLeft =
     headers.find(h =>
       norm(h) === norm("Left Shoulder Mobility (cm)")
@@ -321,6 +339,7 @@ function guessMapping(headers) {
 
   return m;
 }
+
 
 export function renderMapping(headers, initial = {}) {
   rawHeaders = headers;
